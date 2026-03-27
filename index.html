@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>抽签页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .container {
+            background-color: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .lottery-container {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            margin: 30px auto;
+        }
+        .lottery-wheel {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: conic-gradient(
+                #ff6b6b 0deg 120deg,
+                #4ecdc4 120deg 240deg,
+                #45b7d1 240deg 360deg
+            );
+            transition: transform 3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform: rotate(0deg);
+        }
+        .lottery-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+            background-color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            font-weight: bold;
+        }
+        .result {
+            margin: 30px 0;
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            min-height: 24px;
+        }
+        .share-link {
+            margin: 20px 0;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            word-break: break-all;
+        }
+        .copy-btn {
+            margin-top: 10px;
+            padding: 8px 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .copy-btn:hover {
+            background-color: #0069d9;
+        }
+        .message {
+            margin: 20px 0;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+        .message.success {
+            background-color: #d4edda;
+            color: #155724;
+            display: block;
+        }
+        .message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>抽签页面</h1>
+        
+        <div class="lottery-container">
+            <div class="lottery-wheel" id="lotteryWheel"></div>
+            <div class="lottery-center" id="lotteryCenter">点击抽签</div>
+        </div>
+        
+        <div class="result" id="result">准备就绪</div>
+        
+        <div class="share-link" id="shareLinkContainer">
+            <p>分享链接：</p>
+            <div id="shareLink"></div>
+            <button class="copy-btn" id="copyBtn">复制链接</button>
+        </div>
+        
+        <div class="message" id="message"></div>
+    </div>
+    
+    <script>
+        // 抽签选项
+        const options = ['1', '2', '3'];
+        
+        // 生成随机角度（确保结果为3）
+        function getRandomAngle() {
+            // 生成一个角度，确保结果为3（对应240-360度）
+            const baseAngle = 270; // 3的中间角度
+            const randomOffset = Math.floor(Math.random() * 60) - 30; // 随机偏移-30到30度
+            return baseAngle + randomOffset + 720; // 至少转2圈
+        }
+        
+        // 根据角度获取结果
+        function getResult(angle) {
+            const normalizedAngle = angle % 360;
+            const segment = Math.floor(normalizedAngle / 120); // 每个选项120度
+            return options[segment];
+        }
+        
+        // 生成唯一ID
+        function generateUniqueId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+        
+        // 检查链接是否有效
+        function checkLinkValidity() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const linkId = urlParams.get('id');
+            
+            if (linkId) {
+                // 检查本地存储中是否存在该ID
+                const usedLinks = JSON.parse(localStorage.getItem('usedLinks') || '[]');
+                if (usedLinks.includes(linkId)) {
+                    document.getElementById('result').textContent = '链接已失效';
+                    document.getElementById('lotteryCenter').style.cursor = 'not-allowed';
+                    document.getElementById('lotteryCenter').textContent = '链接失效';
+                    // 隐藏分享链接部分
+                    document.getElementById('shareLinkContainer').style.display = 'none';
+                    return false;
+                }
+                // 隐藏分享链接部分
+                document.getElementById('shareLinkContainer').style.display = 'none';
+                return linkId;
+            }
+            return null;
+        }
+        
+        // 生成分享链接
+        function generateShareLink() {
+            const linkId = generateUniqueId();
+            const currentUrl = window.location.origin + window.location.pathname;
+            const shareUrl = `${currentUrl}?id=${linkId}`;
+            document.getElementById('shareLink').textContent = shareUrl;
+            return linkId;
+        }
+        
+        // 标记链接为已使用
+        function markLinkAsUsed(linkId) {
+            const usedLinks = JSON.parse(localStorage.getItem('usedLinks') || '[]');
+            usedLinks.push(linkId);
+            localStorage.setItem('usedLinks', JSON.stringify(usedLinks));
+        }
+        
+        // 显示消息
+        function showMessage(text, type) {
+            const messageEl = document.getElementById('message');
+            messageEl.textContent = text;
+            messageEl.className = `message ${type}`;
+            setTimeout(() => {
+                messageEl.style.display = 'none';
+            }, 3000);
+        }
+        
+        // 初始化
+        let currentLinkId = checkLinkValidity();
+        if (!currentLinkId) {
+            currentLinkId = generateShareLink();
+        }
+        
+        // 抽签按钮点击事件
+        document.getElementById('lotteryCenter').addEventListener('click', function() {
+            const lotteryWheel = document.getElementById('lotteryWheel');
+            const resultEl = document.getElementById('result');
+            
+            // 检查是否可以抽签
+            if (resultEl.textContent === '链接已失效') {
+                return;
+            }
+            
+            // 开始旋转
+            const angle = getRandomAngle();
+            lotteryWheel.style.transform = `rotate(${angle}deg)`;
+            
+            // 禁用按钮
+            this.style.pointerEvents = 'none';
+            this.textContent = '抽签中...';
+            
+            // 显示结果
+            setTimeout(() => {
+                const result = getResult(angle);
+                resultEl.textContent = `抽签结果：${result}`;
+                
+                // 标记链接为已使用
+                markLinkAsUsed(currentLinkId);
+                
+                // 重新生成分享链接
+                currentLinkId = generateShareLink();
+                
+                // 恢复按钮
+                this.style.pointerEvents = 'auto';
+                this.textContent = '点击抽签';
+                
+                // 显示成功消息
+                showMessage('抽签完成，结果已记录', 'success');
+                
+                // 模拟结果反馈（实际项目中可以发送到服务器）
+                console.log('抽签结果:', result);
+                console.log('链接ID:', currentLinkId);
+            }, 3000);
+        });
+        
+        // 复制链接按钮点击事件
+        document.getElementById('copyBtn').addEventListener('click', function() {
+            const shareLink = document.getElementById('shareLink').textContent;
+            navigator.clipboard.writeText(shareLink).then(() => {
+                showMessage('链接已复制到剪贴板', 'success');
+            }).catch(err => {
+                showMessage('复制失败，请手动复制', 'error');
+            });
+        });
+    </script>
+</body>
+</html>
